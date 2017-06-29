@@ -14,7 +14,7 @@ public:
     { }
 
   int64_t jump()
-  { 
+  {
     ++m_jump_count;
 
     m_position += m_step_len;
@@ -31,25 +31,17 @@ public:
 private:
   int64_t m_jump_count;
   int64_t m_step_len;
-  int64_t m_position;   
+  int64_t m_position;
   int64_t m_circle;
 };
 
-int main()
+
+int for_match(int64_t position_x, int64_t position_y, int64_t step_x, int64_t setp_y, int64_t line)
 {
-  int64_t position_x = 0;
-  int64_t position_y = 0;
-  int64_t step_x = 0;
-  int64_t setp_y = 0;
-  int64_t line = 0;
-
-  std::cin >> position_x >> position_y >> step_x >> setp_y >> line;
-
   if (position_x == position_y || position_x >= MAX_POSITION || position_y >= MAX_POSITION
     || step_x >= MAX_STEP || step_x <= 0 || setp_y >= MAX_STEP || setp_y <= 0
     || line >= MAX_CIRCLE || line <= 0) {
-    std::cout << "Impossible";
-    return 0;
+    return -1;
   }
 
   forg x(position_x, step_x, line);
@@ -63,7 +55,23 @@ int main()
       break;
   }
 
-  std::cout << x.jump_count();
+  return x.jump_count();
+}
+
+int main()
+{
+  int64_t position_x = 0;
+  int64_t position_y = 0;
+  int64_t step_x = 0;
+  int64_t setp_y = 0;
+  int64_t line = 0;
+
+  std::cin >> position_x >> position_y >> step_x >> setp_y >> line;
+  int64_t ret = for_match(position_x, position_y, step_x, setp_y, line);
+  if (ret < 0)
+    std::cout << "Impossible";
+  else
+    std::cout << ret;
 
   return 0;
 }

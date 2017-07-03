@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 2.8)
 
-PROJECT(hello_world)
+#PROJECT(hello_world)
+
+message("OK")
 
 SET(INCLUDE_BASE ./include)
 SET(THIRDPART_BASE ./third_party)
@@ -13,12 +15,10 @@ SET(GTEST_INCLUDE_PATH GOOGLE_BASE/googletest/include/gtest)
 SET(GMOCK_INCLUDE_PATH GOOGLE_BASE/googlemock/include/gmock)
 
 SET(EXECUTABLE_OUTPUT_PATH ./build)
-SET (CMAKE_CXX_COMPILER "g++")
-ADD_DEFINITIONS("std=c++0x -g")
 
 ADD_SUBDIRECTORY(src)
 
-if (BUILD_TEST)
-  ADD_SUBDIRECTORY(test)
-endif
 
+#if (BUILD_TEST)
+#  ADD_SUBDIRECTORY(test)
+#endif

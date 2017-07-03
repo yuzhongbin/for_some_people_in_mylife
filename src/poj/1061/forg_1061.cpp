@@ -1,6 +1,6 @@
 #include <iostream>
 
-typedef long int64_t;
+// typedef long int64_t;
 #define MAX_POSITION  2000000000
 #define MAX_STEP      2000000000
 #define MAX_CIRCLE    2100000000
@@ -66,8 +66,9 @@ int main()
   int64_t setp_y = 0;
   int64_t line = 0;
 
-  std::cin >> position_x >> position_y >> step_x >> setp_y >> line;
-  int64_t ret = for_match(position_x, position_y, step_x, setp_y, line);
+  // std::cin >> position_x >> position_y >> step_x >> setp_y >> line;
+  // int64_t ret = for_match(position_x, position_y, step_x, setp_y, line);
+  int64_t ret = for_match(1,2,3,4,5);
   if (ret < 0)
     std::cout << "Impossible";
   else

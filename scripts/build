@@ -1,0 +1,339 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# TODO: license discrption
+
+import argparse
+import codecs
+import json
+import multiprocessing
+import os
+import scanbuild
+import subprocess
+import sys
+
+_SCRIPT_PATH = os.path.abspath(os.path.dirname(sys.argv[0]))
+_SCRIPT_NAME = os.path.basename(sys.argv[0])
+_ROOT_PATH   = os.path.abspath('{}/..'.format(_SCRIPT_PATH))
+
+_DEBUG_FLAG = [' -DCMAKE_BUILD_TYPE=Release', ' -DCMAKE_BUILD_TYPE=Debug']
+
+_VERBOSE_FLAG = [' -DCMAKE_VERBOSE_MAKEFILE=OFF', ' -DCMAKE_VERBOSE_MAKEFILE=ON']
+
+_PROJECTS_JSON = """
+{
+  "projects" :
+  [
+    {
+      "title" : "ut32",
+      "board" : "ut",
+      "product" : "ut",
+      "platform" : "uxx",
+      "compiler" : "gcc-4.7.1",
+      "arch" : "x86",
+      "bitwide" : 32,
+      "default_debug" : true
+    },
+    {
+      "title" : "ut64",
+      "board" : "ut",
+      "product" : "ut",
+      "platform" : "uxx",
+      "compiler" : "gcc-4.7.1",
+      "arch" : "x86",
+      "bitwide" : 64,
+      "default_debug" : true
+    },
+    {
+      "title" : "gcc32",
+      "board" : "ut",
+      "product" : "ut",
+      "platform" : "xx",
+      "compiler" : "gcc-last",
+      "arch" : "x86",
+      "bitwide" : 32,
+      "default_debug" : true
+    },
+    {
+      "title" : "gcc64",
+      "board" : "ut",
+      "product" : "ut",
+      "platform" : "xx",
+      "compiler" : "gcc-last",
+      "arch" : "x86",
+      "bitwide" : 64,
+      "default_debug" : true
+    },
+    {
+      "title" : "ut32cov",
+      "board" : "ut",
+      "product" : "ut",
+      "platform" : "xx",
+      "compiler" : "clang",
+      "arch" : "x86",
+      "bitwide" : 32,
+      "default_debug" : true
+    },
+    {
+      "title" : "ut64cov",
+      "board" : "ut",
+      "product" : "ut",
+      "platform" : "xx",
+      "compiler" : "clang",
+      "arch" : "x86",
+      "bitwide" : 64,
+      "default_debug" : true
+    },
+    {
+      "title" : "asan",
+      "board" : "ut",
+      "product" : "ut",
+      "platform" : "xx",
+      "compiler" : "clang",
+      "arch" : "x86",
+      "bitwide" : 64,
+      "default_debug" : true
+    },
+    {
+      "title" : "tsan",
+      "board" : "ut",
+      "product" : "ut",
+      "platform" : "xx",
+      "compiler" : "clang",
+      "arch" : "x86",
+      "bitwide" : 64,
+      "default_debug" : true
+    },
+    {
+      "title" : "csb",
+      "board" : "ut",
+      "product" : "ut",
+      "platform" : "xx",
+      "compiler" : "scan-build",
+      "arch" : "x86",
+      "bitwide" : 64,
+      "default_debug" : true
+    },
+    {
+      "title" : "sutfp",
+      "board" : "simulator",
+      "product" : "simulator",
+      "platform" : "xx",
+      "compiler" : "gcc",
+      "arch" : "x86",
+      "bitwide" : 32,
+      "default_debug" : true
+    }
+  ]
+}"""
+
+_VALID_VERSIONS = ['V1_0_0']
+
+_all_projects = []
+_projects_json = None
+
+
+# script args
+class check_arg_project(argparse.Action):
+  def __call__(self, parser, namespace, values, option_string=None):
+    if not values in _all_projects:
+      raise Exception('{}: error: argument {} \'{}\' isn\'t a valid project.\n'
+        'The valid project should be one of {}.'.format(
+        _SCRIPT_NAME, '/'.join(self.option_strings), values, _all_projects))
+    setattr(namespace, self.dest, values)
+
+
+class check_arg_version(argparse.Action):
+  def __call__(self, parser, namespace, values, option_string=None):
+    if not values in _VALID_VERSIONS:
+      raise Exception('{}: error: argument {} \'{}\' isn\'t a valid version.\n'
+        'The valid version should be one of {}.'.format(
+        _SCRIPT_NAME, '/'.join(self.option_strings), values, _VALID_VERSIONS))
+    setattr(namespace, self.dest, values)
+
+
+def str2bool(v):
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    if v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
+
+
+def parse_args():
+  parser = argparse.ArgumentParser(description='Build hello_word.')
+  parser.add_argument('-p', '--project', type=str, required=True,
+    action=check_arg_project, help='Build project.')
+  parser.add_argument('-s', '--version', type=str, default='V1_0_0',
+    action=check_arg_version, help='Project version.')
+  parser.add_argument('-d', '--debug', type=str2bool, nargs='?', const=True,
+    help='Build in debug type.')
+  parser.add_argument('-r', '--rebuild', action='store_true',
+    help='Rebuild.')
+  parser.add_argument('-v', '--verbose', action='store_true',
+    help='Display verbose information.')
+  parser.add_argument('-c', '--only-cmake', action='store_true',
+    help='Only generate cmake files.')
+
+  try:
+    return parser.parse_args()
+  except Exception as e:
+    sys.stderr.write(e)
+    sys.exit(1)
+
+
+# json helper functions
+def parse_projects_json():
+  global _projects_json
+  _projects_json = json.loads(_PROJECTS_JSON)['projects']
+
+  global _all_projects
+  for i in range(len(_projects_json)):
+    _all_projects.append(_projects_json[i]['title'])
+  _all_projects.append('all')
+
+
+def query_project_json(project_title):
+  for i in range(len(_projects_json)):
+    if project_title == _projects_json[i]['title']:
+      return _projects_json[i]
+  return None
+
+
+# build helper functions
+def parse_build_projects(args):
+  build_projects = [args.project]
+  if 'all' in build_projects:
+    build_projects = _all_projects
+    build_projects.remove('all')
+  return build_projects
+
+
+def prepare_build_dir(project, rebuild):
+  build_path = '{}/build/{}'.format(_ROOT_PATH, project)
+  if rebuild and os.path.exists(build_path):
+    subprocess.call('rm -rf {}'.format(build_path), shell=True)
+  if not os.path.exists(build_path):
+    os.makedirs(build_path)
+  return build_path
+
+
+def check_shell_output(cmd):
+  try:
+    output = subprocess.check_output(cmd, shell=True)
+    return output, None
+  except Exception as e:
+    return '', e
+
+
+def try_compiler(expect_compiler, default_compiler):
+  compiler_fullpath, exception = check_shell_output(
+    'which {}'.format(expect_compiler))
+  return default_compiler if exception else expect_compiler
+
+
+def prepare_compiler(compiler):
+  make_prefix = ''
+  if compiler == 'gcc':
+    os.environ['CC'] = 'gcc'
+    os.environ['CXX'] = 'g++'
+  elif compiler == 'gcc-4.7.1':
+    os.environ['CC'] = try_compiler('gcc-4.7.1', 'gcc')
+    os.environ['CXX'] = try_compiler('g++-4.7.1', 'g++')
+  elif compiler == 'gcc-last':
+    os.environ['CC'] = try_compiler('gcc-last', 'gcc')
+    os.environ['CXX'] = try_compiler('g++-last', 'g++')
+  elif compiler == 'clang':
+    os.environ['CC'] = 'clang'
+    os.environ['CXX'] = 'clang++'
+  elif compiler == 'scan-build':
+    make_prefix = scanbuild.prefix()
+
+  return make_prefix
+
+
+def print_build_title(project, rebuild, debug):
+  build_title = '{}\n{} {} {} version ...\n\n'.format(
+  '-------------------------------------------------------------------',
+  project, 'rebuild' if rebuild else 'build', 'debug' if debug else 'release')
+  sys.stdout.write(build_title)
+
+
+def prepare_build_env(args, project):
+  debug   = args.debug
+  rebuild = args.rebuild
+  verbose = args.verbose
+  version = args.version
+
+  project_json = query_project_json(project)
+  arch     = project_json['arch']
+  bitwide  = project_json['bitwide']
+  board    = project_json['board']
+  compiler = project_json['compiler']
+  platform = project_json['platform']
+  product  = project_json['product']
+  default_debug = project_json['default_debug']
+
+  if debug is None:
+    debug = default_debug
+
+  cmake_flags = '-DPROJECT={} -DVERSION={} -DPLATFORM={} -DARCH={}' \
+    ' -DBITWIDE={} -DCOMPILER={}'.format(project, version, platform, arch,
+      bitwide, compiler)
+
+  if (product == 'ut'):
+    cmake_flags += ' -DBUILD_TEST=ON -DUSP_STUB=ON'
+
+  cmake_flags += _DEBUG_FLAG[debug]
+  cmake_flags += _VERBOSE_FLAG[verbose]
+
+  cmd_prefix = prepare_compiler(compiler)
+  build_path = prepare_build_dir(project, rebuild)
+  os.chdir(build_path)
+
+  print_build_title(project, rebuild, debug)
+
+  return build_path, cmd_prefix, cmake_flags
+
+
+def run_cmake(build_path, cmake_prefix, cmake_flags):
+  cmake_root = os.path.relpath(_ROOT_PATH, build_path)
+  cmake_cmd = '{} cmake {} {}'.format(cmake_prefix, cmake_flags, cmake_root).strip()
+  sys.stdout.write('{}\n\n'.format(cmake_cmd))
+  return subprocess.call(cmake_cmd, shell=True)
+
+
+def run_make(make_prefix):
+  make_cmd = '{} make -j{}'.format(make_prefix, multiprocessing.cpu_count()).strip()
+  sys.stdout.write('\n{}\n\n'.format(make_cmd))
+  return subprocess.call(make_cmd, shell=True)
+
+
+def build(args):
+  build_projects = parse_build_projects(args)
+  for project in build_projects:
+    build_path, cmd_prefix, cmake_flags = prepare_build_env(args, project)
+
+    cmake_result = run_cmake(build_path, cmd_prefix, cmake_flags)
+    if cmake_result != 0:
+      return cmake_result
+
+    if args.only_cmake:
+      continue
+
+    make_result = run_make(cmd_prefix)
+    if make_result != 0:
+      return make_result
+
+  return 0
+
+
+def main():
+  parse_projects_json()
+  args = parse_args()
+  result = build(args)
+  sys.exit(result)
+
+
+if __name__ == '__main__':
+  main()

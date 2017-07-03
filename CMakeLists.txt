@@ -18,5 +18,7 @@ ADD_DEFINITIONS("std=c++0x -g")
 
 ADD_SUBDIRECTORY(src)
 
-ADD_EXECUTABLE(hello_world ${SRC_CODE})
+if (BUILD_TEST)
+  ADD_SUBDIRECTORY(test)
+endif
 

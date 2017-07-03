@@ -1,9 +1,9 @@
 cmake_minimum_required(VERSION 2.8)
 
-AUX_SOURCE_DIRECTORY(. DIR_SRCS)
+AUX_SOURCE_DIRECTORY(. SRC_LIST)
+ADD_LIBRARY(hello-word-poj-1061-objects OBJECT ${SRC_LIST})
 
-MESSAGE("CASE_1061=${CASE_1061}")
-
-ADD_LIBRARY(CASE_1061 ${DIR_SRCS})
-
-MESSAGE("CASE_1061=${CASE_1061}")
+SET(hello-word-poj-1061
+  $<TARGET_OBJECTS:hello-word-poj-1061-objects>
+  #add more objects before here
+  PARENT_SCOPE)

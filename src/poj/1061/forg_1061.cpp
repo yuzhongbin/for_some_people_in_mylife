@@ -1,5 +1,9 @@
 #include <iostream>
 
+#if BUILD_TEST == ON
+#include "forg_1061.h"
+#endif
+
 // typedef long int64_t;
 #define MAX_POSITION  2000000000
 #define MAX_STEP      2000000000
@@ -36,7 +40,8 @@ private:
 };
 
 
-int for_match(int64_t position_x, int64_t position_y, int64_t step_x, int64_t setp_y, int64_t line)
+int forg_for_match(int64_t position_x, int64_t position_y,
+  int64_t step_x, int64_t setp_y, int64_t line)
 {
   if (position_x == position_y || position_x >= MAX_POSITION || position_y >= MAX_POSITION
     || step_x >= MAX_STEP || step_x <= 0 || setp_y >= MAX_STEP || setp_y <= 0
@@ -58,6 +63,7 @@ int for_match(int64_t position_x, int64_t position_y, int64_t step_x, int64_t se
   return x.jump_count();
 }
 
+#if BUILD_TEST != ON
 int main()
 {
   int64_t position_x = 0;
@@ -68,7 +74,7 @@ int main()
 
   // std::cin >> position_x >> position_y >> step_x >> setp_y >> line;
   // int64_t ret = for_match(position_x, position_y, step_x, setp_y, line);
-  int64_t ret = for_match(1,2,3,4,5);
+  int64_t ret = forg_for_match(1,2,3,4,5);
   if (ret < 0)
     std::cout << "Impossible";
   else
@@ -76,3 +82,4 @@ int main()
 
   return 0;
 }
+#endif
